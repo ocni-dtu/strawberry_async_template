@@ -1,0 +1,59 @@
+apiVersion: skaffold/v4beta1
+kind: Config
+metadata:
+  name: ASYNC_STRAWBERRY
+build:
+  artifacts:
+    - image: registry.example.com/ASYNC_STRAWBERRY
+      sync:
+        manual:
+          - src: src/**/*.py
+            dest: /app/src
+            strip: src
+        hooks:
+          after:
+            - container:
+                command:
+                  - bash
+                  - /app/export_schema.sh
+            - host:
+                command:
+                  - bash
+                  - extract_schema.sh
+                os:
+                  - darwin
+                  - linux
+      docker:
+        dockerfile: ./Dockerfile
+        buildArgs:
+          BUILD_STAGE: DEV
+          BUILD_VERSION: DEV
+manifests:
+  helm:
+    flags:
+      upgrade:
+        - --install
+    releases:
+      - name: ASYNC_STRAWBERRY
+        chartPath: helm
+        namespace: ASYNC_STRAWBERRY
+        setValues:
+          appDomain: localhost:4000
+          appProtocol: http
+          db.ssl: "false"
+          deployType: DEV
+          imageKey.registry: registry.example.com
+        createNamespace: true
+deploy:
+  helm: { }
+portForward:
+  - resourceType: service
+    resourceName: backend-service
+    port: 8000
+    namespace: ASYNC_STRAWBERRY
+
+  - resourceType: service
+    namespace: ASYNC_STRAWBERRY
+    resourceName: database-service
+    port: 5432
+    localPort: 5430
